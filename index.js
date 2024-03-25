@@ -19,8 +19,8 @@ app.use(
     credentials: true,
   })
 );
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -38,7 +38,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true,
+      secure: false,
       maxAge: 14 * 24 * 60 * 60 * 1000,
       httpOnly: false,
     },
