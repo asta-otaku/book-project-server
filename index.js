@@ -38,9 +38,9 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // Change to true if using HTTPS
+      secure: false,
       maxAge: 14 * 24 * 60 * 60 * 1000,
-      httpOnly: true,
+      // httpOnly: true,
     },
   })
 );
