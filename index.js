@@ -40,8 +40,8 @@ app.use(
     cookie: {
       secure: true,
       maxAge: 14 * 24 * 60 * 60 * 1000,
-      sameSite: "strict",
-      httpOnly: true,
+      // sameSite: "",
+      httpOnly: false,
     },
   })
 );
@@ -352,20 +352,27 @@ async function run() {
     });
 
     app.post("/users/logout", (req, res) => {
-      req.logout((err) => {
-        if (err) return res.status(500).json({ error: err });
-        req.session.destroy(function (err) {
-          if (!err) {
-            res
-              .status(200)
-              .clearCookie("connect.sid", { path: "/" })
-              .json({ status: "Success" });
-          } else {
-            // handle error case...
-            res.status(500).json({ error: err });
-          }
-        });
-      });
+      if (req.user) {
+        req.session.destroy();
+        res.clearCookie("connect.sid"); // clean up!
+        return res.json({ msg: "logging you out" });
+      } else {
+        return res.json({ msg: "no user to log out!" });
+      }
+      // req.logout((err) => {
+      //   if (err) return res.status(500).json({ error: err });
+      //   req.session.destroy(function (err) {
+      //     if (!err) {
+      //       res
+      //         .status(200)
+      //         .clearCookie("connect.sid", { path: "/" })
+      //         .json({ status: "Success" });
+      //     } else {
+      //       // handle error case...
+      //       res.status(500).json({ error: err });
+      //     }
+      //   });
+      // });
     });
 
     // Send a ping to confirm a successful connection
