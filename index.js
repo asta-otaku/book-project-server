@@ -25,26 +25,23 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.set("trust proxy", 1);
-app.use(
-  session({
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGO_URI,
-      ttl: 14 * 24 * 60 * 60,
-      autoRemove: "native",
-      collectionName: "my-sessions",
-      dbName: "BookInventory",
-    }),
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: true,
-      maxAge: 14 * 24 * 60 * 60 * 1000,
-      // sameSite: "",
-      httpOnly: false,
-    },
-  })
-);
+app.use(session({
+  store: MongoStore.create({
+    mongoUrl: process.env.MONGO_URI,
+    ttl: 14 * 24 * 60 * 60,
+    autoRemove: "native",
+    collectionName: "my-sessions",
+    dbName: "BookInventory",
+  }),
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // Change to true if using HTTPS
+    maxAge: 14 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+  },
+}));
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -98,6 +95,7 @@ app.get("/users", isAuth, async (req, res) => {
 
 app.get("/users/user-info", isAuth, async (req, res) => {
   try {
+    console.log("request user", req.user)
     const userInfo = req.user; // user property is added to the request object by passport
     res.status(200).json({
       userInfo: userInfo,
@@ -159,7 +157,10 @@ app.post(
   "/users/login",
   validateEmailAndPassword,
   isVerified,
-  passport.authenticate("local"),
+  passport.authenticate("local", {
+    failureRedirect: "/login",
+    failureFlash: true,
+  }),
   async (req, res) => {
     res.status(200).json({ status: 200, Message: "Login successful" });
   }
