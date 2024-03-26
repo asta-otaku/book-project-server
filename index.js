@@ -25,23 +25,25 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 app.set("trust proxy", 1);
-app.use(session({
-  store: MongoStore.create({
-    mongoUrl: process.env.MONGO_URI,
-    ttl: 14 * 24 * 60 * 60,
-    autoRemove: "native",
-    collectionName: "my-sessions",
-    dbName: "BookInventory",
-  }),
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: false, // Change to true if using HTTPS
-    maxAge: 14 * 24 * 60 * 60 * 1000,
-    httpOnly: true,
-  },
-}));
+app.use(
+  session({
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      ttl: 14 * 24 * 60 * 60,
+      autoRemove: "native",
+      collectionName: "my-sessions",
+      dbName: "BookInventory",
+    }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      secure: false, // Change to true if using HTTPS
+      maxAge: 14 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+    },
+  })
+);
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -95,7 +97,6 @@ app.get("/users", isAuth, async (req, res) => {
 
 app.get("/users/user-info", isAuth, async (req, res) => {
   try {
-    console.log("request user", req.user)
     const userInfo = req.user; // user property is added to the request object by passport
     res.status(200).json({
       userInfo: userInfo,
@@ -299,6 +300,24 @@ app.post("/create-checkout-session", async (req, res) => {
   res.json({ id: session.id });
 });
 
+// Handle logout
+app.post("/users/logout", (req, res) => {
+  req.logout((err) => {
+    if (err) {
+      return res.status(500).json({ error: "Logout failed" });
+    }
+
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Session destroy failed" });
+      }
+
+      res.clearCookie("connect.sid");
+      res.json({ msg: "Logged out successfully" });
+    });
+  });
+});
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -352,29 +371,22 @@ async function run() {
       res.json(result);
     });
 
-    app.post("/users/logout", (req, res) => {
-      if (req.user) {
-        req.session.destroy();
-        res.clearCookie("connect.sid"); // clean up!
-        return res.json({ msg: "logging you out" });
-      } else {
-        return res.json({ msg: "no user to log out!" });
-      }
-      // req.logout((err) => {
-      //   if (err) return res.status(500).json({ error: err });
-      //   req.session.destroy(function (err) {
-      //     if (!err) {
-      //       res
-      //         .status(200)
-      //         .clearCookie("connect.sid", { path: "/" })
-      //         .json({ status: "Success" });
-      //     } else {
-      //       // handle error case...
-      //       res.status(500).json({ error: err });
-      //     }
-      //   });
-      // });
-    });
+    // app.post("/users/logout", (req, res) => {
+    //   req.logout((err) => {
+    //     if (err) return res.status(500).json({ error: err });
+    //     req.session.destroy(function (err) {
+    //       if (!err) {
+    //         res
+    //           .status(200)
+    //           .clearCookie("connect.sid", { path: "/" })
+    //           .json({ status: "Success" });
+    //       } else {
+    //         // handle error case...
+    //         res.status(500).json({ error: err });
+    //       }
+    //     });
+    //   });
+    // });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
