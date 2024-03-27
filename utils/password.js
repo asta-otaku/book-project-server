@@ -6,8 +6,6 @@ const generatePassword = (password) => {
   return bcrypt.hashSync(password, SALT_ROUNDS);
 };
 
-// function to check hashed password in db against password from request
-
 const validatePassword = (passwordFromRequest, passwordFromDB) => {
   const isValidPassword = bcrypt.compareSync(
     passwordFromRequest,

@@ -1,7 +1,7 @@
-const { ObjectId } = require("mongodb");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const { validatePassword } = require("../utils/password");
 require("dotenv").config();
+const { sign, verify } = require("jsonwebtoken");
 const uri = process.env.MONGO_URI;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -15,47 +15,60 @@ const client = new MongoClient(uri, {
 
 const usersCollection = client.db("BookInventory").collection("users");
 
-// Middleware to check if user has been authenticated
-const isAuth = (req, res, next) => {
-  if (req.isAuthenticated()) return next();
-  else {
-    res.status(403).json({
-      Message: "User has not been authenticated",
-    });
-  }
-};
-
 const validateEmailAndPassword = async (req, res, next) => {
-  const { email, password } = req.body;
-  const users = await usersCollection.find({ email }).toArray();
-  if (users.length < 1) {
+  const { username, password } = req.body;
+  const user = await usersCollection.findOne({ email: username });
+  if (!user) {
     return res.status(401).json({
       Message: "Invalid Email/Password",
     });
   }
-  const user = users[0];
 
   const isValidPassword = validatePassword(password, user.password);
-  if (isValidPassword) return next();
-  else {
+  if (isValidPassword) {
+    const token = sign({ user: user }, process.env.JWT_SECRET);
+    // Send token to response headers
+    // res.header("Authorization", `Bearer ${token}`);
+    res.status(200).json({ message: token });
+  } else {
     return res.status(401).json({
       Message: "Invalid Email/Password",
     });
   }
+  return next();
 };
 // Middleware to check if user has been verified
 const isVerified = async (req, res, next) => {
-  const users = await usersCollection.find({ email: req.body.email }).toArray();
-  const user = users[0];
+  const user = await usersCollection.findOne({ email: req.body.username });
 
-  console.log(user.verified);
-  if (user.verified) {
-    return next();
-  } else {
-    res.status(403).json({
-      Message: "User not verified",
+  if (!user) {
+    return res.status(404).json({
+      Message: "User not found",
     });
+  }
+
+  if (!user.verified) {
+    req.Message = "User not verified";
   }
 };
 
-module.exports = { isAuth, isVerified, validateEmailAndPassword };
+//middleware to authorize token
+function verifyToken(req, res, next) {
+  const authHeader = req.headers["authorization"];
+  const token = authHeader.split(" ")[1];
+
+  if (!token) {
+    return res
+      .status(401)
+      .json({ message: "Unauthorized, Token not provided" });
+  }
+  verify(token, process.env.JWT_SECRET, (err, decoded) => {
+    if (err) {
+      return res.status(403).json({ message: "Forbidden, Invalid token" });
+    }
+    req.user = decoded;
+    next();
+  });
+}
+
+module.exports = { isVerified, validateEmailAndPassword, verifyToken };

@@ -8,7 +8,6 @@ const session = require("express-session");
 const MongoStore = require("connect-mongo");
 const port = process.env.PORT || 5000;
 const ObjectId = require("mongodb").ObjectId;
-const passport = require("./config/passport_config");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
@@ -37,16 +36,8 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: {
-      secure: false,
-      maxAge: 14 * 24 * 60 * 60 * 1000,
-      // httpOnly: true,
-    },
   })
 );
-
-app.use(passport.initialize());
-app.use(passport.session());
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
@@ -59,7 +50,7 @@ const { generatePassword } = require("./utils/password");
 const {
   isVerified,
   validateEmailAndPassword,
-  isAuth,
+  verifyToken,
 } = require("./middlewares/roles");
 const uri = process.env.MONGO_URI;
 
@@ -89,30 +80,19 @@ const transporter = nodemailer.createTransport({
 // Users collection
 const usersCollection = client.db("BookInventory").collection("users");
 
-app.get("/users", isAuth, async (req, res) => {
+app.get("/users", verifyToken, async (req, res) => {
   const users = await usersCollection.find({}).toArray();
-
   res.json({ users });
 });
 
-app.get("/users/user-info", isAuth, async (req, res) => {
-  try {
-    const userInfo = req.user; // user property is added to the request object by passport
-    res.status(200).json({
-      userInfo: userInfo,
-    });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      Message: "Internal Server Error",
-    });
-  }
+app.get("/users/user-info", verifyToken, async (req, res) => {
+  return res.status(200).json({ data: req.user });
 });
 
 app.post("/users/signup", async (req, res) => {
   // check if the user already exists
-  const users = await usersCollection.find({ email: req.body.email }).toArray();
-  if (users.length > 0) {
+  const user = await usersCollection.findOne({ email: req.body.email });
+  if (user) {
     return res.status(409).send("User already exists");
   }
 
@@ -129,7 +109,7 @@ app.post("/users/signup", async (req, res) => {
     (newUser.verified = false), console.log(otp);
 
     const mailOptions = {
-      from: "afolabiibrahim08@gmail.com",
+      from: process.env.TRANSPORTER_EMAIL,
       to: req.body.email,
       subject: "One-Time Passcode (OTP)",
       text: `Your One-Time Passcode (OTP) is: ${otp}`,
@@ -140,7 +120,6 @@ app.post("/users/signup", async (req, res) => {
         console.log(error);
         res.status(500).send("Failed to send OTP");
       } else {
-        console.log("Email sent: " + info.response);
         res.status(200).send("OTP sent successfully");
       }
     });
@@ -158,12 +137,10 @@ app.post(
   "/users/login",
   validateEmailAndPassword,
   isVerified,
-  passport.authenticate("local", {
-    failureRedirect: "/login",
-    failureFlash: true,
-  }),
   async (req, res) => {
-    res.status(200).json({ status: 200, Message: "Login successful" });
+    res.status(200).json({
+      Message: req.Message,
+    });
   }
 );
 
@@ -263,6 +240,7 @@ app.post("/users/verify", async (req, res) => {
           $set: { verified: true },
         }
       );
+      // passport.authenticate("local");
       res.status(200).json({
         Message: "User Verified Successfully",
       });
@@ -344,14 +322,14 @@ async function run() {
     });
 
     // Insert a book to the database using post method
-    app.post("/upload-book", isAuth, async (req, res) => {
+    app.post("/upload-book", verifyToken, async (req, res) => {
       const newBook = req.body;
       const result = await bookCollections.insertOne(newBook);
       res.json(result);
     });
 
     // Update a book using patch method
-    app.patch("/update-book/:id", isAuth, async (req, res) => {
+    app.patch("/update-book/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const updatedBook = req.body;
       const filter = { _id: new ObjectId(id) };
@@ -365,28 +343,22 @@ async function run() {
     });
 
     // Delete a book using delete method
-    app.delete("/delete-book/:id", isAuth, async (req, res) => {
+    app.delete("/delete-book/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const result = await bookCollections.deleteOne({ _id: new ObjectId(id) });
       res.json(result);
     });
 
-    // app.post("/users/logout", (req, res) => {
-    //   req.logout((err) => {
-    //     if (err) return res.status(500).json({ error: err });
-    //     req.session.destroy(function (err) {
-    //       if (!err) {
-    //         res
-    //           .status(200)
-    //           .clearCookie("connect.sid", { path: "/" })
-    //           .json({ status: "Success" });
-    //       } else {
-    //         // handle error case...
-    //         res.status(500).json({ error: err });
-    //       }
-    //     });
-    //   });
-    // });
+    app.post("/users/logout", (req, res) => {
+      req.session.destroy((err) => {
+        if (err) {
+          res.status(400).json({ message: "Failed to logout" });
+        }
+      });
+      res.status(200).json({
+        Message: "User logged out successfully",
+      });
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
