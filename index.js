@@ -273,10 +273,56 @@ app.post("/create-checkout-session", async (req, res) => {
   res.json({ id: session.id });
 });
 
+const loggingSessionsCollection = client
+  .db("BookInventory")
+  .collection("logging_sessions");
+
+app.put("/users/logout/:id", async (req, res) => {
+  const { id } = req.params;
+  const logoutTime = new Date();
+  try {
+    const result = await loggingSessionsCollection.findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: { logoutTime: logoutTime } },
+      { returnOriginal: false }
+    );
+
+    console.log(`Login session ${id} ended at ${logoutTime}`);
+    res.status(200).json({
+      success: true,
+    });
+
+  } catch (error) {
+    console.log("error", error);
+  }
+});
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
+
+    // const database = client.db("BookInventory");
+
+    // // Create collection
+    // const loggingSessionsCollection = database.collection("logging_sessions");
+
+    // console.log("Connected to MongoDB");
+
+    // // Example document to insert
+    // const userId = new ObjectId(); // Example user ID
+    // const loginTime = new Date();
+
+    // // Insert document
+    // const result = await loggingSessionsCollection.insertOne({
+    //   userId,
+    //   loginTime,
+    //   logoutTime: null,
+    // });
+
+    // console.log(
+    //   `${result.insertedCount} document inserted with _id: ${result.insertedId}`
+    // );
 
     // Create a collection of documents
     const bookCollections = client.db("BookInventory").collection("books");

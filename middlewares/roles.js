@@ -13,6 +13,21 @@ const client = new MongoClient(uri, {
   },
 });
 
+const loggingSessionsCollection = client
+  .db("BookInventory")
+  .collection("logging_sessions");
+
+async function logUserLogin(userId) {
+  const loginTime = new Date();
+  const result = await loggingSessionsCollection.insertOne({
+    userId,
+    loginTime,
+    logoutTime: null,
+  });
+  console.log(`User ${userId} session started at ${loginTime}`);
+  return result.insertedId;
+}
+
 const usersCollection = client.db("BookInventory").collection("users");
 
 const validateEmailAndPassword = async (req, res, next) => {
@@ -27,9 +42,10 @@ const validateEmailAndPassword = async (req, res, next) => {
   const isValidPassword = validatePassword(password, user.password);
   if (isValidPassword) {
     const token = sign({ user: user }, process.env.JWT_SECRET);
+    const loggingID = await logUserLogin(user?._id);
     // Send token to response headers
     // res.header("Authorization", `Bearer ${token}`);
-    res.status(200).json({ message: token });
+    res.status(200).json({ message: token, loggingID });
   } else {
     return res.status(401).json({
       Message: "Invalid Email/Password",
