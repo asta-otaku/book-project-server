@@ -273,24 +273,6 @@ app.post("/create-checkout-session", async (req, res) => {
   res.json({ id: session.id });
 });
 
-// Handle logout
-app.post("/users/logout", (req, res) => {
-  req.logout((err) => {
-    if (err) {
-      return res.status(500).json({ error: "Logout failed" });
-    }
-
-    req.session.destroy((err) => {
-      if (err) {
-        return res.status(500).json({ error: "Session destroy failed" });
-      }
-
-      res.clearCookie("connect.sid");
-      res.json({ msg: "Logged out successfully" });
-    });
-  });
-});
-
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -342,17 +324,6 @@ async function run() {
       const id = req.params.id;
       const result = await bookCollections.deleteOne({ _id: new ObjectId(id) });
       res.json(result);
-    });
-
-    app.post("/users/logout", (req, res) => {
-      req.session.destroy((err) => {
-        if (err) {
-          res.status(400).json({ message: "Failed to logout" });
-        }
-      });
-      res.status(200).json({
-        Message: "User logged out successfully",
-      });
     });
 
     // Send a ping to confirm a successful connection
